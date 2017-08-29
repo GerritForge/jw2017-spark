@@ -123,4 +123,24 @@ object Transformers {
       }
     }
   }
+
+  implicit class PimpedEventRdd(val rdd: RDD[Event]) {
+
+    def toJson: RDD[String] = {
+      rdd.map(write(_)(DefaultFormats))
+    }
+
+    def calculateDurations()(implicit sc: SparkSession): Dataset[Event] = {
+      import sc.sqlContext.implicits._
+
+      rdd.toDF
+        .withColumn("duration",
+          col("epoch") - lag(col("epoch"), 1)
+            .over(Window
+              .partitionBy("changeNum")
+              .orderBy("epoch"))).as[Event]
+    }
+
+    def filterChanges: RDD[Event] = rdd.filter(_.changeNum.isDefined)
+  }
 }

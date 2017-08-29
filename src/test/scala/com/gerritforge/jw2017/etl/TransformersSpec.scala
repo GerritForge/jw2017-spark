@@ -73,4 +73,35 @@ class TransformersSpec extends SparkEtlSpec with Inside with Inspectors {
         branch should be(patchsetCreatedEvent.refName)
     }
   }
+
+  "Generic events" should
+    "be converted back into JSON" in withSpark { sc =>
+
+    val eventsRdd = sc.sparkContext.parallelize(Seq(gerritEvent, jenkinsEvent))
+
+    val eventsJson = eventsRdd.toJson.collect()
+
+    eventsJson should have size 2
+    forAll(eventsJson) { json =>
+      inside(parse(json)) {
+        case JObject(fields) => fields should not be empty
+      }
+    }
+  }
+
+  it should "include the duration of ordered events" in withSpark { implicit sc =>
+    val firstEvent = gerritEvent
+    val secondEvent = gerritEvent.copy(
+      id = UUID.randomUUID().toString,
+      epoch = firstEvent.epoch + 1000L)
+    val eventsRdd = sc.sparkContext.parallelize(Seq(secondEvent, firstEvent))
+
+    val eventsDurations = eventsRdd.calculateDurations.collect
+
+    val firstDuration: Option[Long] = eventsDurations.head.duration
+    val secondDuration: Option[Long] = eventsDurations.last.duration
+
+    firstDuration should be(None)
+    secondDuration should be(Some(1000L))
+  }
 }
