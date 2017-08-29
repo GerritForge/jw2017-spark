@@ -1,0 +1,12 @@
+#!/bin/bash -xe
+
+[ -f ./target/scala-2.11/jenkins-gerrit-events-etl-shaded.jar ] || sbt assembly
+
+spark-submit \
+    --conf spark.es.nodes=elasticsearch \
+    --conf spark.es.net.http.auth.user=elastic \
+    --conf spark.es.net.http.auth.pass=changeme \
+    ./target/scala-2.11/jenkins-gerrit-events-etl-shaded.jar \
+    -g /var/output/gerrit.events.queue \
+    -j /var/output/jenkins.jobs.queue \
+    -e pipeline/events
